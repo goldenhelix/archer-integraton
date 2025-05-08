@@ -1,0 +1,67 @@
+name: Run Archer Analysis
+description: Submit FASTQ files to Archer Analysis, download results, and create VarSeq project
+
+stages:
+  - name: Submit
+    description: Upload FASTQ files and start Archer Analysis protocol
+    task_path: archer_job_submit.task.yaml
+    depends_on: []
+    task_parameters:
+      - name: fastq_folder
+        label: Input FASTQ Folder
+        type: directory
+
+      - name: protocol_id
+        label: Protocol ID
+        type: integer
+        # value: "3697" # Put the protocol ID here
+
+      - name: job_name
+        label: Job Name
+        type: string
+        optional: true
+        help: Custom name for the analysis job (if not provided, will use the FASTQ folder name)
+
+  - name: Download
+    description: Download results from Archer Analysis
+    task_path: archer_job_download.task.yaml
+    depends_on:
+      - Submit
+    task_parameters:
+      - name: job_id
+        label: Archer Job ID
+        type: stage
+        stage: Submit
+        stage_parameter_expression: "${job_id}"
+      - name: results_folder
+        label: Results Folder
+        type: stage
+        stage: Submit
+        stage_parameter_expression: "${fastq_folder}/${job_id}_${job_name}"
+
+  - name: VSPipeline
+    description: Create VarSeq project from Archer results
+    task_path: archer_vspipeline.task.yaml
+    depends_on:
+      - Download
+    task_parameters:
+      - name: project_template
+        label: VarSeq Template
+        type: file
+        path: /AppData/VarSeq/User Data/ProjectTemplates/
+        value: /Automation/Archer/Archer_Variant_Plex.vsproject-template
+      - name: base_path
+        label: Input Folder
+        type: stage
+        stage: Submit
+        stage_parameter_expression: "${fastq_folder}/${job_id}_${job_name}"
+      - name: project_name
+        label: Project Name
+        type: stage
+        stage: Submit
+        stage_parameter_expression: "${job_id}_${job_name}"
+      - name: sample_manifest
+        label: Sample Manifest (TSV)
+        type: stage
+        stage: Submit
+        stage_parameter_expression: "${fastq_folder}/${job_id}_${job_name}/samples.tsv"

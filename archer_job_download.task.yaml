@@ -1,0 +1,67 @@
+name: Archer Job Download
+description: Download results from a completed Archer Analysis job
+
+agent_requirements:
+  cpu_cores: 1
+  memory_gb: 1
+
+env_file: .env.archer_credentials
+
+parameters:
+  - name: job_id
+    label: Archer Job ID
+    type: integer
+
+  - name: results_folder
+    label: Results Folder
+    type: directory
+    help: Destination folder for downloading results from Archer Analysis
+
+  - name: wait_interval
+    label: Wait Interval (seconds)
+    type: integer
+    value: "10"
+    help: How often to check job status when waiting
+    optional: true
+
+  - name: debug_mode
+    label: Enable Debug Mode
+    type: boolean
+    value: "true"
+    help: Keep the job details file for debugging
+
+steps:
+  - name: download_archer_results
+    description: Download results from Archer Analysis
+    type: cmd
+    args:
+      - |-
+        set -euo pipefail
+
+        # Set wait interval if provided
+        wait_interval_flag=""
+        if [ ! -z "${wait_interval}" ]; then
+          wait_interval_flag="-t ${wait_interval}"
+        fi
+
+        # Construct debug flag if enabled
+        debug_flag=""
+        if [ "${debug_mode}" = "true" ]; then
+          debug_flag="-d"
+        fi
+
+        mkdir -p "${results_folder}"
+
+        # Disable python buffering
+        export PYTHONUNBUFFERED=1
+
+        # Run the download script
+        python3 ${TASK_DIR}/archer_job_download.py \
+          -u "${ARCHER_EMAIL}" \
+          -a "${ARCHER_API_KEY}" \
+          -s "${ARCHER_URL}" \
+          -f "${results_folder}" \
+          -i "${job_id}" \
+          -w ${wait_interval_flag} \
+          ${debug_flag}
+

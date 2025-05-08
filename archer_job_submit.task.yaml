@@ -1,0 +1,74 @@
+
+name: Archer Job Submit
+description: Upload FASTQ files and start a protocol on the Archer Analysis platform
+
+agent_requirements:
+  cpu_cores: 1
+  memory_gb: 4
+
+env_file: .env.archer_credentials
+
+parameters:
+  - name: fastq_folder
+    label: FASTQ Input Folder
+    type: directory
+    help: Directory containing FASTQ files to analyze
+
+  - name: protocol_id
+    label: Protocol ID
+    type: integer
+    help: Archer Analysis protocol ID to use for analysis
+    # value: "3697" # Put the protocol ID here
+
+  - name: job_name
+    label: Job Name
+    type: string
+    optional: true
+    help: Custom name for the analysis job (if not provided, will use the FASTQ folder name)
+
+  - name: debug_mode
+    label: Enable Debug Mode
+    type: boolean
+    value: "false"
+    help: Save intermediate data for debugging purposes
+
+steps:
+  - name: submit_archer_job
+    description: Submit job to Archer Analysis
+    type: cmd
+    args:
+      - |-
+        set -euo pipefail
+
+        # If job name not provided, use the last directory name from fastq_folder path
+        if [ -z "${job_name}" ]; then
+          job_name=$(basename "${fastq_folder}")
+        fi
+
+        # Replace any '_' in job name with '-'
+        job_name=$(echo "${job_name}" | tr '_' '-')
+
+        # Construct debug flag if enabled
+        debug_flag=""
+        if [ "${debug_mode}" = "true" ]; then
+          debug_flag="-d"
+        fi
+
+        # Disable python buffering
+        export PYTHONUNBUFFERED=1
+
+        # Test shortcut for debugging
+        # echo "job_id=18203" > result.env
+        # echo "job_name=${job_name}" >> result.env
+        # exit 0
+
+        # Run the submission script
+        python3 ${TASK_DIR}/archer_job_submit.py \
+          -u "${ARCHER_EMAIL}" \
+          -a "${ARCHER_API_KEY}" \
+          -s "${ARCHER_URL}" \
+          -f "${fastq_folder}" \
+          --protocol_id "${protocol_id}" \
+          -j "${job_name}" \
+          -o result.env \
+          ${debug_flag}
